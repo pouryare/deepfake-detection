@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Deep Fake Detection</title>
+    <link href="https://fonts.googleapis.com/css?family=Roboto:300,400,500" rel="stylesheet">
+    <link href="https://unpkg.com/material-components-web@latest/dist/material-components-web.min.css" rel="stylesheet">
+    <script src="https://unpkg.com/material-components-web@latest/dist/material-components-web.min.js"></script>
+    <style>
+        body {
+            font-family: 'Roboto', sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            padding: 24px;
+            width: 100%;
+            max-width: 500px;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 24px;
+        }
+        .bento-box {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        .card {
+            background-color: #fff;
+            border-radius: 4px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24);
+            padding: 16px;
+        }
+        .file-input-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            margin-bottom: 16px;
+        }
+        .file-input-wrapper input[type=file] {
+            font-size: 100px;
+            position: absolute;
+            left: 0;
+            top: 0;
+            opacity: 0;
+            cursor: pointer;
+        }
+        .file-name {
+            margin-top: 8px;
+            font-size: 14px;
+            text-align: center;
+        }
+        .image-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-top: 16px;
+            margin-bottom: 16px;
+            min-height: 200px;
+        }
+        #preview {
+            max-width: 100%;
+            max-height: 300px;
+        }
+        #result-card {
+            display: none;
+        }
+        .result-fake {
+            color: #d32f2f;
+        }
+        .result-real {
+            color: #388e3c;
+        }
+        .button-container {
+            display: flex;
+            justify-content: center;
+            margin-top: 16px;
+        }
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            display: none;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 class="mdc-typography--headline4">Deep Fake Detection</h1>
+        </div>
+        <div class="bento-box">
+            <div class="card">
+                <div class="file-input-wrapper">
+                    <button class="mdc-button mdc-button--raised">
+                        <span class="mdc-button__label">Choose File</span>
+                    </button>
+                    <input type="file" id="file-input" accept="image/*">
+                </div>
+                <div class="file-name" id="file-name"></div>
+                <div class="image-container">
+                    <img id="preview" style="display: none;">
+                    <div class="loader" id="loader"></div>
+                </div>
+                <div class="button-container">
+                    <button class="mdc-button mdc-button--raised" id="upload-btn" style="display: none;">
+                        <span class="mdc-button__label">Upload and Analyze</span>
+                    </button>
+                </div>
+            </div>
+            <div class="card" id="result-card">
+                <h2 class="mdc-typography--headline6">Result</h2>
+                <p id="result"></p>
+                <p id="confidence"></p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const fileInput = document.getElementById('file-input');
+            const fileName = document.getElementById('file-name');
+            const preview = document.getElementById('preview');
+            const uploadBtn = document.getElementById('upload-btn');
+            const resultCard = document.getElementById('result-card');
+            const resultText = document.getElementById('result');
+            const confidenceText = document.getElementById('confidence');
+            const loader = document.getElementById('loader');
+
+            fileInput.addEventListener('change', function(e) {
+                if (e.target.files.length > 0) {
+                    fileName.textContent = e.target.files[0].name;
+                    preview.src = URL.createObjectURL(e.target.files[0]);
+                    preview.style.display = 'block';
+                    uploadBtn.style.display = 'inline-flex';
+                }
+            });
+
+            uploadBtn.addEventListener('click', function() {
+                const formData = new FormData();
+                formData.append('file', fileInput.files[0]);
+
+                // Show loader, hide preview
+                loader.style.display = 'block';
+                preview.style.display = 'none';
+                uploadBtn.disabled = true;
+
+                fetch('/predict', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    // Hide loader, show preview
+                    loader.style.display = 'none';
+                    preview.style.display = 'block';
+                    uploadBtn.disabled = false;
+
+                    resultCard.style.display = 'block';
+                    resultText.textContent = `Result: ${data.result}`;
+                    confidenceText.textContent = `Confidence: ${data.confidence}`;
+                    resultText.className = data.result.toLowerCase() === 'fake' ? 'result-fake' : 'result-real';
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    // Hide loader, show preview
+                    loader.style.display = 'none';
+                    preview.style.display = 'block';
+                    uploadBtn.disabled = false;
+                });
+            });
+        });
+    </script>
+</body>
+</html>
