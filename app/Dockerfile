@@ -14,7 +14,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 EXPOSE 8080
 
 # Define environment variable
-ENV FLASK_APP=main.py
+ENV FLASK_APP=app.py
 
 # Run main.py when the container launches
 CMD ["python", "app.py"]
